@@ -1,0 +1,63 @@
+# SnakeMake Workflow for scBS-Seq
+# Christoph Geisenberger
+# last edit 26.03.2023
+
+
+# extract all sample names from 'raw' diretory
+GENOME='/media/Leia/cgeisenberger/genomes/hsapiens/hg38'
+INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
+print(INPUT)
+
+rule all:
+    input:
+        expand("context_files_merged/CpG_context_{name}_merged_trimmed_bismark_bt2.deduplicated.txt.gz", name=INPUT)
+        #expand("trimmed_reads/{name}_trimmed.fq.gz", name=INPUT)
+
+rule trim_galore_se:
+    input:
+        "raw/{sample}.fastq.gz"
+    output:
+        "trimmed_reads/{sample}_trimmed.fq.gz"
+    shell:
+        "trim_galore --output_dir trimmed_reads --clip_R1 9 --three_prime_clip_r1 9 {input}"
+
+rule mapping:
+    input:
+        file="trimmed_reads/{sample}_trimmed.fq.gz",
+        ref=GENOME
+    output:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    threads: 4
+    shell:
+        "bismark --output_dir mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel {threads} {input.file}"
+
+rule deduplication:
+    input:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam"
+    shell:
+        "deduplicate_bismark --output_dir deduplicated_reads {input}"
+
+rule extract_methylation:
+    input:
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam"
+    output:
+        "context_files/CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz"
+        #"context_files/Non_CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz"
+    threads: 4
+    shell:
+        "bismark_methylation_extractor --output context_files"
+        " --gzip --comprehensive --merge_non_CpG"
+        " --parallel {threads} -s {input}"
+
+rule merge_context_files:
+    input:
+        r1="context_files/CpG_context_{sample}_R1_001_trimmed_bismark_bt2.deduplicated.txt.gz",
+        r2="context_files/CpG_context_{sample}_R2_001_trimmed_bismark_bt2.deduplicated.txt.gz"
+        #expand("context_files/CpG_context_{s}_{r}_001_trimmed_bismark_bt2.deduplicated.txt.gz", s=INPUT, r=['R1', 'R2'])
+    output:
+        "context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz"
+    shell:
+        "bismark2bedGraph --dir context_files_merged -o CpG_context_{wildcards.sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz {input.r1} {input.r2}"

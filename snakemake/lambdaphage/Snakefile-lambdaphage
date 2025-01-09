@@ -1,0 +1,47 @@
+# SnakeMake Workflow for scBS-Seq
+# Christoph Geisenberger
+# last edit 26.03.2023
+
+
+# extract all sample names from 'raw' diretory
+GENOME='/media/Yoda/cgeisenberger/genomes/lambdaphage/'
+INPUT=glob_wildcards('trimmed_reads/{file}_R1_001_trimmed.fq.gz').file
+print(INPUT)
+
+rule all:
+    input:
+        expand("lambda_phage/log/mapping/{name}_R1_001_trimmed_bismark_bt2_SE_report.txt", name=INPUT)
+        #expand("trimmed_reads/{name}_trimmed.fq.gz", name=INPUT)
+
+rule mapping:
+    input:
+        file="trimmed_reads/{sample}_trimmed.fq.gz",
+        ref=GENOME
+    output:
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam",
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    threads: 1
+    shell:
+        "bismark --output_dir lambda_phage/mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel {threads} {input.file}"
+
+rule deduplication:
+    input:
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
+        "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    shell:
+        "deduplicate_bismark --output_dir lambda_phage/deduplicated_reads {input}"
+
+rule collect_logfiles:
+    input:
+        mapping="lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt",
+        deduplication="lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    output:
+        "lambda_phage/log/mapping/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    shell:
+        "mkdir -p lambda_phage/log/mapping && "
+        "mkdir -p lambda_phage/log/deduplication && "
+        "mv {input.mapping} lambda_phage/log/mapping && "
+        "mv {input.deduplication} lambda_phage/log/deduplication"

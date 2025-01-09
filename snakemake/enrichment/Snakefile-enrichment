@@ -1,0 +1,58 @@
+# SnakeMake Workflow for enrichment analysis of bisulfite sequencing data
+# Christoph Geisenberger
+# last edit 29.03.2023
+
+
+# extract all sample names from 'raw' diretory
+INPUT = glob_wildcards('mapped_reads/{file}_R1_001_trimmed_bismark_bt2.bam').file
+print(INPUT)
+
+rule all:
+    input:
+        expand('heatmaps/{s}_R1_001_trimmed_bismark_bt2_matrix.png', s=INPUT)
+
+rule samtools_sort:
+    input:
+        "mapped_reads/{sample}.bam"
+    output:
+        "sorted_reads/{sample}.bam"
+    shell:
+        "samtools sort -T sorted_reads/{wildcards.sample} "
+        "-O bam {input} > {output}"
+
+rule samtools_index:
+    input:
+        "sorted_reads/{sample}.bam"
+    output:
+        "sorted_reads/{sample}.bam.bai"
+    shell:
+        "samtools index {input}"
+
+rule create_bigwig:
+    input:
+        bam="sorted_reads/{sample}.bam",
+        bai="sorted_reads/{sample}.bam.bai"
+    output:
+        "bigwigs/{sample}.bw"
+    shell:
+        "bamCoverage -b {input.bam} -o {output}"
+
+rule compute_matrix:
+    input:
+        bw="bigwigs/{sample}.bw",
+        ref="/media/Yoda/cgeisenberger/annotation/epicseq_stm_v1_hg38.bed"
+    output:
+        "matrices/{sample}_matrix.tab.gz"
+    shell:
+        "computeMatrix reference-point -S {input.bw} -R {input.ref} --referencePoint center -a 1000 -b 1000 -out {output}"
+
+rule plot_heatmap:
+    input:
+        "matrices/{sample}_matrix.tab.gz"
+    output:
+        "heatmaps/{sample}_matrix.png"
+    shell:
+        "mkdir -p heatmaps && "
+        "plotHeatmap -m {input} -out {output} "
+        "--heatmapHeight 15  --refPointLabel CpG "
+        "--regionsLabel Baits"
