@@ -1,0 +1,195 @@
+# Snakemake workflow combining all methlab workflows
+
+HUMAN_GENOME='/media/Leia/cgeisenberger/genomes/hsapiens/hg38/'
+LP_GENOME='/media/Leia/cgeisenberger/genomes/lambdaphage/'
+CNV_REF_GENOME="/media/Leia/cgeisenberger/genomes/hsapiens/hg38/hg38_windowed_1M.bed"
+CNV_NORMAL_CONTROL="/media/Leia/cgeisenberger/analysis/cnv-calling/normal_lung_1M.bed"
+
+# extract all sample names from 'raw' directory
+INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
+print(INPUT)
+
+# TODO: Overall report file
+rule all:
+    input:
+        expand("reports/{name}_overall_report.pdf", name=INPUT)
+        #expand("trimmed_reads/{name}_trimmed.fq.gz", name=INPUT)
+
+rule trim_galore_se:
+    input:
+        "raw/{sample}.fastq.gz"
+    output:
+        "trimmed_reads/{sample}_trimmed.fq.gz"
+    threads: 4
+    shell:
+        "trim_galore --output_dir trimmed_reads --clip_R1 9 --three_prime_clip_r1 9 {input}"
+
+rule mapping:
+    input:
+        file="trimmed_reads/{sample}_trimmed.fq.gz",
+        ref=HUMAN_GENOME
+    output:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam",
+        "mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    threads: 4
+    shell:
+        "bismark --output_dir mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel 1 {input.file}"
+
+rule deduplication:
+    input:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    shell:
+        "deduplicate_bismark --output_dir deduplicated_reads {input}"
+
+rule extract_methylation:
+    input:
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam"
+    output:
+        "context_files/CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz",
+        "context_files/{sample}_trimmed_bismark_bt2.deduplicated_splitting_report.txt"
+        #"context_files/Non_CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz"
+    threads: 3
+    shell:
+        "bismark_methylation_extractor --output context_files"
+        " --gzip --comprehensive --merge_non_CpG"
+        " --parallel 1 -s {input}"
+
+rule merge_context_files:
+    input:
+        r1="context_files/CpG_context_{sample}_R1_001_trimmed_bismark_bt2.deduplicated.txt.gz",
+        r2="context_files/CpG_context_{sample}_R2_001_trimmed_bismark_bt2.deduplicated.txt.gz"
+        #expand("context_files/CpG_context_{s}_{r}_001_trimmed_bismark_bt2.deduplicated.txt.gz", s=INPUT, r=['R1', 'R2'])
+    output:
+        "context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz"
+    shell:
+        "bismark2bedGraph --dir context_files_merged -o CpG_context_{wildcards.sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz {input.r1} {input.r2}"
+
+
+# lambdaphage part
+rule LP_mapping:
+    input:
+        file="trimmed_reads/{sample}_trimmed.fq.gz",
+        ref=LP_GENOME
+    output:
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam",
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    threads: 3
+    shell:
+        "bismark --output_dir lambda_phage/mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel 1 {input.file}"
+
+rule LP_deduplication:
+    input:
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
+        "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    shell:
+        "deduplicate_bismark --output_dir lambda_phage/deduplicated_reads {input}"
+
+rule LP_collect_logfiles:
+    input:
+        mapping="lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt",
+        deduplication="lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    output:
+        "lambda_phage/log/mapping/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    shell:
+        "mkdir -p lambda_phage/log/mapping && "
+        "mkdir -p lambda_phage/log/deduplication && "
+        "mv {input.mapping} lambda_phage/log/mapping && "
+        "mv {input.deduplication} lambda_phage/log/deduplication"
+
+# enrichment part
+
+rule samtools_sort:
+    input:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "sorted_reads/{sample}_trimmed_bismark_bt2.bam"
+    shell:
+        "samtools sort -T sorted_reads/{wildcards.sample} "
+        "-O bam {input} > {output}"
+
+rule samtools_index:
+    input:
+        "sorted_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "sorted_reads/{sample}_trimmed_bismark_bt2.bam.bai"
+    shell:
+        "samtools index {input}"
+
+rule create_bigwig:
+    input:
+        bam="sorted_reads/{sample}_trimmed_bismark_bt2.bam",
+        bai="sorted_reads/{sample}_trimmed_bismark_bt2.bam.bai"
+    output:
+        "bigwigs/{sample}_trimmed_bismark_bt2.bw"
+    shell:
+        "bamCoverage -b {input.bam} -o {output}"
+
+rule compute_matrix:
+    input:
+        bw="bigwigs/{sample}_trimmed_bismark_bt2.bw",
+        ref="/media/Leia/cgeisenberger/annotation/epicseq_stm_v1_hg38.bed"
+    output:
+        "matrices/{sample}_matrix.tab.gz"
+    shell:
+        "computeMatrix reference-point -S {input.bw} -R {input.ref} --referencePoint center -a 1000 -b 1000 -out {output}"
+
+rule plot_heatmap:
+    input:
+        "matrices/{sample}_matrix.tab.gz"
+    output:
+        "heatmaps/{sample}_matrix.png"
+    shell:
+        "mkdir -p heatmaps && "
+        "plotHeatmap -m {input} -out {output} "
+        "--heatmapHeight 15  --refPointLabel CpG "
+        "--regionsLabel Baits"
+
+# copy number part
+rule calculate_coverage:
+    input:
+        bam_r1="mapped_reads/{sample}_R1_001_trimmed_bismark_bt2.bam",
+        bam_r2="mapped_reads/{sample}_R2_001_trimmed_bismark_bt2.bam",
+        ref=CNV_REF_GENOME
+    output:
+        "cnv_files/{sample}_binned_1M.bed"
+    shell:
+        "bedtools coverage -a {input.ref} -b {input.bam_r1} {input.bam_r2} > cnv_files/{wildcards.sample}_binned_1M.bed"
+
+rule cnv_image:
+    input:
+        bed="cnv_files/{sample}_binned_1M.bed",
+        ref=CNV_NORMAL_CONTROL
+    output:
+        "cnv_plots/{sample}_CNV_profile.png"
+    script:
+        "scripts/cnv.R"
+
+
+# complete report
+rule create_report:
+    input:
+        context_merged="context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz",
+        map_rep_r1="mapped_reads/{sample}_R1_001_trimmed_bismark_bt2_SE_report.txt",
+        map_rep_r2="mapped_reads/{sample}_R2_001_trimmed_bismark_bt2_SE_report.txt",
+        dedup_rep_r1="deduplicated_reads/{sample}_R1_001_trimmed_bismark_bt2.deduplication_report.txt",
+        dedup_rep_r2="deduplicated_reads/{sample}_R2_001_trimmed_bismark_bt2.deduplication_report.txt",
+        context_r1="context_files/{sample}_R1_001_trimmed_bismark_bt2.deduplicated_splitting_report.txt",
+        context_r2="context_files/{sample}_R2_001_trimmed_bismark_bt2.deduplicated_splitting_report.txt",
+        lp_rep="lambda_phage/log/mapping/{sample}_R1_001_trimmed_bismark_bt2_SE_report.txt",
+        heatm="heatmaps/{sample}_R1_001_matrix.png",
+        cnv="cnv_plots/{sample}_CNV_profile.png"
+    output:
+        "reports/{sample}_overall_report.pdf"
+    params:
+        title="Targeted-BS Report"
+    resources:
+        pdfReport=1
+    script:
+        "scripts/overall_report.Rmd"
