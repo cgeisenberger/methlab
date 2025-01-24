@@ -9,12 +9,12 @@ CNV_NORMAL_CONTROL="/media/Leia/cgeisenberger/analysis/cnv-calling/normal_lung_1
 INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
 print(INPUT)
 
-# TODO: Overall report file
+# generate a report for each sample
 rule all:
     input:
         expand("reports/{name}_overall_report.pdf", name=INPUT)
-        #expand("trimmed_reads/{name}_trimmed.fq.gz", name=INPUT)
 
+# trim adapters
 rule trim_galore_se:
     input:
         "raw/{sample}.fastq.gz"
@@ -24,6 +24,7 @@ rule trim_galore_se:
     shell:
         "trim_galore --output_dir trimmed_reads --clip_R1 9 --three_prime_clip_r1 9 {input}"
 
+# map to reference genome
 rule mapping:
     input:
         file="trimmed_reads/{sample}_trimmed.fq.gz",
@@ -36,6 +37,7 @@ rule mapping:
         "bismark --output_dir mapped_reads --non_directional"
         " --genome_folder {input.ref} --parallel 1 {input.file}"
 
+# remove duplicate reads
 rule deduplication:
     input:
         "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
@@ -45,6 +47,7 @@ rule deduplication:
     shell:
         "deduplicate_bismark --output_dir deduplicated_reads {input}"
 
+# generate methylation context files
 rule extract_methylation:
     input:
         "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam"
@@ -58,6 +61,7 @@ rule extract_methylation:
         " --gzip --comprehensive --merge_non_CpG"
         " --parallel 1 -s {input}"
 
+# merge R1 and R2 files
 rule merge_context_files:
     input:
         r1="context_files/CpG_context_{sample}_R1_001_trimmed_bismark_bt2.deduplicated.txt.gz",
@@ -69,7 +73,8 @@ rule merge_context_files:
         "bismark2bedGraph --dir context_files_merged -o CpG_context_{wildcards.sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz {input.r1} {input.r2}"
 
 
-# lambdaphage part
+# Lamdaphage Control
+# map R1 to lambdaphage genome 
 rule LP_mapping:
     input:
         file="trimmed_reads/{sample}_trimmed.fq.gz",
@@ -82,6 +87,7 @@ rule LP_mapping:
         "bismark --output_dir lambda_phage/mapped_reads --non_directional"
         " --genome_folder {input.ref} --parallel 1 {input.file}"
 
+# remove duplicate reads
 rule LP_deduplication:
     input:
         "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam"
@@ -103,8 +109,9 @@ rule LP_collect_logfiles:
         "mv {input.mapping} lambda_phage/log/mapping && "
         "mv {input.deduplication} lambda_phage/log/deduplication"
 
-# enrichment part
+# Generate Enrichment Heatmap
 
+# sort bam file
 rule samtools_sort:
     input:
         "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
@@ -114,6 +121,7 @@ rule samtools_sort:
         "samtools sort -T sorted_reads/{wildcards.sample} "
         "-O bam {input} > {output}"
 
+# index bam file
 rule samtools_index:
     input:
         "sorted_reads/{sample}_trimmed_bismark_bt2.bam"
@@ -122,6 +130,7 @@ rule samtools_index:
     shell:
         "samtools index {input}"
 
+# get coverage info in bigwig
 rule create_bigwig:
     input:
         bam="sorted_reads/{sample}_trimmed_bismark_bt2.bam",
@@ -131,6 +140,7 @@ rule create_bigwig:
     shell:
         "bamCoverage -b {input.bam} -o {output}"
 
+# create heatmap data
 rule compute_matrix:
     input:
         bw="bigwigs/{sample}_trimmed_bismark_bt2.bw",
@@ -140,6 +150,7 @@ rule compute_matrix:
     shell:
         "computeMatrix reference-point -S {input.bw} -R {input.ref} --referencePoint center -a 1000 -b 1000 -out {output}"
 
+# plot enrichment heatmap
 rule plot_heatmap:
     input:
         "matrices/{sample}_matrix.tab.gz"
@@ -152,6 +163,7 @@ rule plot_heatmap:
         "--regionsLabel Baits"
 
 # copy number part
+# calculate stepwise coverage 
 rule calculate_coverage:
     input:
         bam_r1="mapped_reads/{sample}_R1_001_trimmed_bismark_bt2.bam",
@@ -162,6 +174,7 @@ rule calculate_coverage:
     shell:
         "bedtools coverage -a {input.ref} -b {input.bam_r1} {input.bam_r2} > cnv_files/{wildcards.sample}_binned_1M.bed"
 
+# plot coverage against reference
 rule cnv_image:
     input:
         bed="cnv_files/{sample}_binned_1M.bed",
