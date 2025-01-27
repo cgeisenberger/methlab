@@ -21,8 +21,10 @@ rule trim_galore_se:
     output:
         "trimmed_reads/{sample}_trimmed.fq.gz"
     threads: 4
+    log:
+        "logs/trimmed_reads/{sample}_trimming_log.txt"
     shell:
-        "trim_galore --output_dir trimmed_reads --clip_R1 9 --three_prime_clip_r1 9 {input}"
+        "trim_galore --output_dir trimmed_reads --clip_R1 9 --three_prime_clip_r1 9 {input} &> {log}"
 
 # map to reference genome
 rule mapping:
@@ -32,10 +34,12 @@ rule mapping:
     output:
         "mapped_reads/{sample}_trimmed_bismark_bt2.bam",
         "mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
-    threads: 4
+    threads: 5
+    log:
+        "logs/mapped_reads/{sample}_mapping_log.txt"
     shell:
         "bismark --output_dir mapped_reads --non_directional"
-        " --genome_folder {input.ref} --parallel 1 {input.file}"
+        " --genome_folder {input.ref} --parallel 1 {input.file} &> {log}"
 
 # remove duplicate reads
 rule deduplication:
@@ -44,8 +48,10 @@ rule deduplication:
     output:
         "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
         "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    log:
+        "deduplicated_reads/{sample}_deduplication_log.txt"
     shell:
-        "deduplicate_bismark --output_dir deduplicated_reads {input}"
+        "deduplicate_bismark --output_dir deduplicated_reads {input} &> {log}"
 
 # generate methylation context files
 rule extract_methylation:
@@ -56,10 +62,12 @@ rule extract_methylation:
         "context_files/{sample}_trimmed_bismark_bt2.deduplicated_splitting_report.txt"
         #"context_files/Non_CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz"
     threads: 3
+    log:
+        "context_files/{sample}_extraction_log.txt"
     shell:
         "bismark_methylation_extractor --output context_files"
         " --gzip --comprehensive --merge_non_CpG"
-        " --parallel 1 -s {input}"
+        " --parallel 1 -s {input} &> {log}"
 
 # merge R1 and R2 files
 rule merge_context_files:
@@ -83,6 +91,8 @@ rule LP_mapping:
         "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam",
         "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
     threads: 3
+    log:
+        "lambda_phage/log/mapping/{sample}_mapping_log.txt"
     shell:
         "bismark --output_dir lambda_phage/mapped_reads --non_directional"
         " --genome_folder {input.ref} --parallel 1 {input.file}"
@@ -94,6 +104,8 @@ rule LP_deduplication:
     output:
         "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
         "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    log:
+        "lambda_phage/log/deduplication/{sample}_deduplication_log.txt"
     shell:
         "deduplicate_bismark --output_dir lambda_phage/deduplicated_reads {input}"
 
