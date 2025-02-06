@@ -9,6 +9,33 @@ CNV_NORMAL_CONTROL="/media/Leia/cgeisenberger/analysis/cnv-calling/normal_lung_1
 INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
 print(INPUT)
 
+# functions
+import subprocess
+import os
+
+# Custom function to check if a BAM file contains at least one alignment
+def has_alignments(bam_file):
+    print(f"SAMTOOLS VIEW WORKING DIRECTORY: {os.getcwd()}")
+    try:
+        # Run 'samtools view -c' to get the count of alignments
+        result = subprocess.run(['samtools', 'view', '-c', bam_file], 
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # Check if the command ran successfully
+        if result.returncode != 0:
+            print(f"Error running samtools on {bam_file}: {result.stderr}")
+            return False
+        
+        # Convert the result to an integer and check if the count is greater than 0
+        alignment_count = int(result.stdout.strip())
+        print(f"Number of alignments in BAM {bam_file}: {alignment_count}")
+        return alignment_count > 0
+        
+    except Exception as e:
+        print(f"Error checking BAM file {bam_file}: {e}")
+        return False
+
+
 # generate a report for each sample
 rule all:
     input:
@@ -37,9 +64,13 @@ rule mapping:
     threads: 5
     log:
         "logs/mapped_reads/{sample}_mapping_log.txt"
-    shell:
-        "bismark --output_dir mapped_reads --non_directional"
-        " --genome_folder {input.ref} --parallel 1 {input.file} &> {log}"
+
+    retries: 3
+    run:
+        shell("bismark --output_dir mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel 1 {input.file} &> {log}")
+        if not has_alignments(f"mapped_reads/{wildcards.sample}_trimmed_bismark_bt2.bam"):
+            raise ValueError(f"The BAM file contains no alignments.")
 
 # remove duplicate reads
 rule deduplication:
