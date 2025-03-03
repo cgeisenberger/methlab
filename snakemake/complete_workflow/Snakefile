@@ -1,12 +1,9 @@
 # Snakemake workflow combining all methlab workflows
 
-HUMAN_GENOME='/media/Leia/cgeisenberger/genomes/hsapiens/hg38/'
-LP_GENOME='/media/Leia/cgeisenberger/genomes/lambdaphage/'
-CNV_REF_GENOME="/media/Leia/cgeisenberger/genomes/hsapiens/hg38/hg38_windowed_1M.bed"
-CNV_NORMAL_CONTROL="/media/Leia/cgeisenberger/analysis/cnv-calling/normal_lung_1M.bed"
+configfile: "config/config.yaml"
 
 # extract all sample names from 'raw' directory
-INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
+INPUT=glob_wildcards('fastq/{file}_R1_001.fastq.gz').file
 print(INPUT)
 
 # functions
@@ -44,7 +41,7 @@ rule all:
 # trim adapters
 rule trim_galore_se:
     input:
-        "raw/{sample}.fastq.gz"
+        "fastq/{sample}.fastq.gz"
     output:
         "trimmed_reads/{sample}_trimmed.fq.gz"
     threads: 4

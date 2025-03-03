@@ -1,0 +1,4 @@
+HUMAN_GENOME: '/media/Leia/cgeisenberger/genomes/hsapiens/hg38/'
+LP_GENOME: '/media/Leia/cgeisenberger/genomes/lambdaphage/'
+CNV_REF_GENOME: "/media/Leia/cgeisenberger/genomes/hsapiens/hg38/hg38_windowed_1M.bed"
+CNV_NORMAL_CONTROL: "/media/Leia/cgeisenberger/analysis/cnv-calling/normal_lung_1M.bed"
