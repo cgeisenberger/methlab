@@ -1,9 +1,9 @@
 # Snakemake workflow combining all methlab workflows
 
-configfile: "config/config.yaml"
+configfile: "/mnt/ssd/private/teska/methlab/snakemake/complete_workflow/config/config.yaml"
 
 # extract all sample names from 'raw' directory
-INPUT=glob_wildcards('fastq/{file}_R1_001.fastq.gz').file
+INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
 print(INPUT)
 
 # functions
@@ -41,7 +41,7 @@ rule all:
 # trim adapters
 rule trim_galore_se:
     input:
-        "fastq/{sample}.fastq.gz"
+        "raw/{sample}.fastq.gz"
     output:
         "trimmed_reads/{sample}_trimmed.fq.gz"
     threads: 4
@@ -54,7 +54,7 @@ rule trim_galore_se:
 rule mapping:
     input:
         file="trimmed_reads/{sample}_trimmed.fq.gz",
-        ref=HUMAN_GENOME
+        ref=config["HUMAN_GENOME"]
     output:
         "mapped_reads/{sample}_trimmed_bismark_bt2.bam",
         "mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
@@ -114,7 +114,7 @@ rule merge_context_files:
 rule LP_mapping:
     input:
         file="trimmed_reads/{sample}_trimmed.fq.gz",
-        ref=LP_GENOME
+        ref=config["LP_GENOME"]
     output:
         "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam",
         "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
@@ -184,7 +184,7 @@ rule create_bigwig:
 rule compute_matrix:
     input:
         bw="bigwigs/{sample}_trimmed_bismark_bt2.bw",
-        ref="/media/Leia/cgeisenberger/annotation/epicseq_stm_v1_hg38.bed"
+        ref=config["BAITS"]
     output:
         "matrices/{sample}_matrix.tab.gz"
     shell:
@@ -208,7 +208,7 @@ rule calculate_coverage:
     input:
         bam_r1="mapped_reads/{sample}_R1_001_trimmed_bismark_bt2.bam",
         bam_r2="mapped_reads/{sample}_R2_001_trimmed_bismark_bt2.bam",
-        ref=CNV_REF_GENOME
+        ref=config["CNV_REF_GENOME"]
     output:
         "cnv_files/{sample}_binned_1M.bed"
     shell:
@@ -218,7 +218,7 @@ rule calculate_coverage:
 rule cnv_image:
     input:
         bed="cnv_files/{sample}_binned_1M.bed",
-        ref=CNV_NORMAL_CONTROL
+        ref=config["CNV_NORMAL_CONTROL"]
     output:
         "cnv_plots/{sample}_CNV_profile.png"
     script:
@@ -237,7 +237,7 @@ rule create_report:
         context_r2="context_files/{sample}_R2_001_trimmed_bismark_bt2.deduplicated_splitting_report.txt",
         lp_rep="lambda_phage/log/mapping/{sample}_R1_001_trimmed_bismark_bt2_SE_report.txt",
         heatm="heatmaps/{sample}_R1_001_matrix.png",
-        cnv="cnv_plots/{sample}_CNV_profile.png"
+        #cnv="cnv_plots/{sample}_CNV_profile.png"
     output:
         "reports/{sample}_overall_report.pdf"
     params:
