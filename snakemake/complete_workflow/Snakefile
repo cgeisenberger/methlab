@@ -256,7 +256,7 @@ rule create_report:
         context_r2="context_files/{sample}_R2_001_trimmed_bismark_bt2.deduplicated_splitting_report.txt",
         lp_rep="lambda_phage/log/mapping/{sample}_R1_001_trimmed_bismark_bt2_SE_report.txt",
         heatm="heatmaps/{sample}_R1_001_matrix.png",
-        #cnv="cnv_plots/{sample}_CNV_profile.png"
+        cnv="cnv_plots/{sample}_CNV_profile.png"
     output:
         "reports/{sample}_overall_report.pdf"
     params:
@@ -265,3 +265,12 @@ rule create_report:
         pdfReport=1
     script:
         "scripts/overall_report.Rmd"
+
+rule predict_rf:
+    input:
+        context_files=expand("context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz", sample=INPUT)
+    output:
+        mat="rf_prediction/rf_prediction_matrix.csv",
+        top="rf_prediction/rf_top_results.csv"
+    script:
+        "scripts/predict_rf.R"

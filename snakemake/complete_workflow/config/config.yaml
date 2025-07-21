@@ -2,4 +2,5 @@ HUMAN_GENOME: '/mnt/ssd/shared/targeted-bisulfite/genomes/hsapiens/hg38/'
 LP_GENOME: '/mnt/ssd/shared/targeted-bisulfite/genomes/lambdaphage/'
 CNV_REF_GENOME: "/mnt/ssd/shared/targeted-bisulfite/genomes/hsapiens/hg38/hg38_windowed_1M.bed"
 CNV_NORMAL_CONTROL: "/mnt/ssd/shared/targeted-bisulfite/data/processed/normal_controls/normal_lung_1M.bed"
-BAITS: "/mnt/ssd/shared/targeted-bisulfite/annotation/baits/epicseq_stm_v1.bed"
+BAITS: "/mnt/ssd/shared/targeted-bisulfite/annotation/baits/brain_v11b4_v1_hg38.bed"
+RF_MODEL: "/mnt/ssd/shared/targeted-bisulfite/data/external/rf-capper-v11/rf_model_v11.rds"
