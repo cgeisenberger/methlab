@@ -59,10 +59,10 @@ cov_cpg_ls <- lapply(cov_ls, function(cov) {
 
 cov_cpg <- rbindlist(cov_cpg_ls, idcol="sample_name")
 cov_cpg <- cov_cpg[, c("sample_name", "probe", "beta")]
-print(cov_cpg)
+
 cpg_mat <- dcast(cov_cpg, formula = probe ~ sample_name)
 cpg_mat <- as.matrix(cpg_mat, rownames = "probe")
-print(cpg_mat[1:5, 1:5])
+
 # 2. predict on rf_model_v11 (input order!!)
 cpgs <- names(rf_model_v11[["forest"]][["ncat"]])
 
