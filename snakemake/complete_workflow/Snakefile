@@ -2,6 +2,8 @@
 
 configfile: "/mnt/ssd/private/teska/methlab/snakemake/complete_workflow/config/config.yaml"
 
+include: "crossNN.smk"
+
 # extract all sample names from 'raw' directory
 INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
 print(INPUT)
@@ -37,6 +39,11 @@ def has_alignments(bam_file):
 rule all:
     input:
         expand("reports/{name}_overall_report.pdf", name=INPUT)
+
+# trigger with snakemake -R run_crossNN
+rule run_crossNN:
+    input:
+        expand("crossNN/{name}_crossNN_result.txt", name=INPUT)
 
 # trim adapters
 rule trim_galore_se:
