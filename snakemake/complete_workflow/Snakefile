@@ -225,8 +225,8 @@ rule plot_heatmap:
 # calculate stepwise coverage 
 rule calculate_coverage:
     input:
-        bam_r1="mapped_reads/{sample}_R1_001_trimmed_bismark_bt2.bam",
-        bam_r2="mapped_reads/{sample}_R2_001_trimmed_bismark_bt2.bam",
+        bam_r1="deduplicated_reads/{sample}_R1_001_trimmed_bismark_bt2.deduplicated.bam",
+        bam_r2="deduplicated_reads/{sample}_R2_001_trimmed_bismark_bt2.deduplicated.bam",
         ref=config["CNV_REF_GENOME"]
     output:
         "cnv_files/{sample}_binned_1M.bed"
@@ -241,7 +241,7 @@ rule cnv_image:
     output:
         "cnv_plots/{sample}_CNV_profile.png"
     script:
-        "scripts/cnv.R"
+        "scripts/cnv_creation.R"
 
 
 # complete report
