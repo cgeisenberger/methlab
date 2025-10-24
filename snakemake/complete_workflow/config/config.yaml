@@ -7,5 +7,5 @@ BAITS: "/mnt/ssd/shared/targeted-bisulfite/annotation/baits/brain_v11b4_v1_hg38.
 RF_MODEL: "/mnt/ssd/shared/targeted-bisulfite/data/external/rf-capper-v11/rf_model_v11.rds"
 
 # crossNN
-crossNN_trainingset: "/mnt/ssd/shared/targeted_bisulfite/input/models/crossNN/Capper_et_al_NN.pkl"
-crossNN_mapping: "/mnt/ssd/shared/targeted_bisulfite/input/external/crossNN/450K_hg38.bed"
+crossNN_trainingset: "/mnt/ssd/shared/targeted-bisulfite/input/models/crossNN/Capper_et_al_NN.pkl"
+crossNN_mapping: "/mnt/ssd/shared/targeted-bisulfite/input/external/crossNN/450K_hg38.bed"

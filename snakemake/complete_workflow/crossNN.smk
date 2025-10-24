@@ -4,30 +4,34 @@ rule create_bedmethyl:
     shell: """
     zcat {input} | \
     tail -n+2 | \
-    awk 'BEGIN{OFS="\t"} {print $1, $2, $3, 0, 0, 0, 0, 0, 0, 0, $4}' | \
+    awk 'BEGIN{{OFS="\t"}} {{print $1, $2, $3, 0, 0, 0, 0, 0, 0, 0, $4}}' | \
     gzip > {output}
     """
 
 rule annotate_bedmethyl:
     input:
-        bed="bedMethyl/CpG_context_{sample}.bed.gz",
-        map=config["crossNN_mapping"]
+        bed="bedMethyl/CpG_context_{sample}.bed.gz"
     output:
         "bedMethyl/CpG_context_450K_{sample}.bed"
+    params:
+        map=config["crossNN_mapping"]
     shell: """
     zcat {input.bed} | \
     cut -f1-11 | \
-    bedtools intersect -a - -b {input.map} -wa -wb | \
+    bedtools intersect -a - -b {params.map} -wa -wb | \
     awk -v OFS='\t' '$4=$15' | \
-    cut -f1-11 > {output}
+    cut -f1-11 | \
+    sort -k4,4 -u > {output}
     """
 
 rule NN_classifier:
     input:
-        bed="bedMethyl/CpG_context_450K_{sample}.bed",
-        model=config["crossNN_trainingset"]
+        bed="bedMethyl/CpG_context_450K_{sample}.bed"
     output:
         txt="crossNN/{sample}_crossNN_result.txt",
         votes="crossNN/{sample}_crossNN_votes.tsv"
+    params:
+        model=config["crossNN_trainingset"]
+    conda: "envs/NN_model.yaml"
     script:
         "scripts/classify_NN_bedMethyl.py"
