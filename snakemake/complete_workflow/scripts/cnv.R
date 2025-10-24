@@ -84,8 +84,8 @@ cnv_normalize_ref <- function(query_obj, reference_obj){
   # rename reference data columns before merging data
   ref <- ref %>% 
     select(chr, bin, n_reads, bases_ratio) %>% 
-    rename(n_reads = "n_reads_ctrl", 
-           bases_ratio = "bases_ratio_ctrl")
+    rename(n_reads_ctrl = "n_reads", 
+           bases_ratio_ctrl = "bases_ratio")
   
   s <- left_join(s, ref, by = c("chr", "bin"))
   

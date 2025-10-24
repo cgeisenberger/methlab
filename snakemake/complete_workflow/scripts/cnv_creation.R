@@ -1,6 +1,6 @@
 if(!interactive()) pdf(NULL)
 
-source("scripts/cnv.R")
+source(snakemake@params[["cnv_scripts"]])
 
 ref_path <- normalizePath(snakemake@input[["ref"]])
 sample_path <- normalizePath(snakemake@input[["bed"]])

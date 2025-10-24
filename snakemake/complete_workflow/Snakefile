@@ -240,6 +240,10 @@ rule calculate_coverage:
     shell:
         "bedtools coverage -a {input.ref} -b {input.bam_r1} {input.bam_r2} > cnv_files/{wildcards.sample}_binned_1M.bed"
 
+from pathlib import Path
+
+REF = Path(workflow.basedir) / "scripts" / "cnv.R"
+
 # plot coverage against reference
 rule cnv_image:
     input:
@@ -247,6 +251,8 @@ rule cnv_image:
         ref=config["CNV_NORMAL_CONTROL"]
     output:
         "cnv_plots/{sample}_CNV_profile.png"
+    params:
+        cnv_scripts=str(REF)
     script:
         "scripts/cnv_creation.R"
 
