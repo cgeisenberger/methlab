@@ -3,6 +3,7 @@
 configfile: "/mnt/ssd/private/teska/methlab/snakemake/complete_workflow/config/config.yaml"
 
 include: "crossNN.smk"
+include: "meth_atlas.smk"
 
 # extract all sample names from 'raw' directory
 INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
@@ -44,6 +45,22 @@ rule all:
 rule run_crossNN:
     input:
         expand("crossNN/{name}_crossNN_result.txt", name=INPUT)
+
+rule run_crossNN_target:
+    input:
+        expand("crossNN/{name}_targets_crossNN_result.txt", name=INPUT)
+
+rule run_crossNN_untarget:
+    input:
+        expand("crossNN/{name}_no_targets_crossNN_result.txt", name=INPUT)
+
+rule run_crossNN_imputed:
+    input:
+        expand("crossNN/{name}_imputed_crossNN_result.txt", name=INPUT)
+
+rule run_meth_atlas:
+    input:
+        expand("meth_atlas/{name}_deconv_output.csv", name=INPUT)
 
 # trim adapters
 rule trim_galore_se:
@@ -135,10 +152,10 @@ rule LP_mapping:
         shell("bismark --output_dir lambda_phage/mapped_reads --non_directional"
         " --genome_folder {input.ref} --parallel 1 {input.file} &> {log}")
         if not has_alignments(f"lambda_phage/mapped_reads/{wildcards.sample}_trimmed_bismark_bt2.bam"):
-            if resources.nr < 3:
-                raise ValueError(f"The BAM file contains no alignments.")
-            else:
-                shell('echo "fail" > lambda_phage/mapped_reads/{wildcards.sample}_alignment.status')
+            # if resources.nr < 3:
+            #     raise ValueError(f"The BAM file contains no alignments.")
+            # else:
+            shell('echo "fail" > lambda_phage/mapped_reads/{wildcards.sample}_alignment.status')
         else:
             shell('echo "success" > lambda_phage/mapped_reads/{wildcards.sample}_alignment.status')
 

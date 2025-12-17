@@ -7,3 +7,7 @@ dependencies:
   - pandas==1.5.1
   - scikit-learn==1.0.2
   - pytorch==1.12.1
+  - r-base==4.4
+  - bioconductor-impute==1.80.0
+  - r-tidyverse==2.0.0
+  - r-data.table==1.17.8

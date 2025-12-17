@@ -3,9 +3,14 @@ LP_GENOME: '/mnt/ssd/shared/targeted-bisulfite/genomes/lambdaphage/'
 CNV_REF_GENOME: "/mnt/ssd/shared/targeted-bisulfite/genomes/hsapiens/hg38/hg38_windowed_1M.bed"
 #CNV_NORMAL_CONTROL: "/mnt/ssd/shared/targeted-bisulfite/data/processed/normal_controls/normal_lung_1M.bed"
 CNV_NORMAL_CONTROL: "/mnt/nas/shared/targeted_bisulfite_data/CNV_CTRL_M1A_S230_binned_1M.bed"
-BAITS: "/mnt/ssd/shared/targeted-bisulfite/annotation/baits/brain_v11b4_v1_hg38.bed"
+BAITS: "/mnt/ssd/shared/targeted-bisulfite/input/baits/capper_v11b4_hg38.bed"
 RF_MODEL: "/mnt/ssd/shared/targeted-bisulfite/data/external/rf-capper-v11/rf_model_v11.rds"
 
 # crossNN
 crossNN_trainingset: "/mnt/ssd/shared/targeted-bisulfite/input/models/crossNN/Capper_et_al_NN.pkl"
 crossNN_mapping: "/mnt/ssd/shared/targeted-bisulfite/input/external/crossNN/450K_hg38.bed"
+
+# imputation
+BAITS_PROBE: "/mnt/ssd/shared/targeted-bisulfite/input/baits/capper_v11b4_hg38_probelevel.bed"
+DIST_MAT: "/mnt/ssd/shared/targeted-bisulfite/output/data/imputation_reference_euclidean_capper.rds"
+IMP_HELPERS: "/mnt/ssd/shared/targeted-bisulfite/R/processing/imputation.R"
