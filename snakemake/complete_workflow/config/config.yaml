@@ -9,6 +9,7 @@ RF_MODEL: "/mnt/ssd/shared/targeted-bisulfite/data/external/rf-capper-v11/rf_mod
 # crossNN
 crossNN_trainingset: "/mnt/ssd/shared/targeted-bisulfite/input/models/crossNN/Capper_et_al_NN.pkl"
 crossNN_mapping: "/mnt/ssd/shared/targeted-bisulfite/input/external/crossNN/450K_hg38.bed"
+cohort_ground_truth: "/mnt/ssd/shared/targeted-bisulfite/input/data/bisulfite_seq/GEI017/ground_truth_dict.csv"
 
 # imputation
 BAITS_PROBE: "/mnt/ssd/shared/targeted-bisulfite/input/baits/capper_v11b4_hg38_probelevel.bed"

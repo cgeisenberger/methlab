@@ -13,6 +13,10 @@ rule bedMethyl_to_CSV:
   output: "meth_atlas/{sample}.csv"
   shell: "echo 'CpG,{wildcards.sample}' > {output} && awk {AWK_TERM:q} {input} >> {output}"
 
+use rule bedMethyl_to_CSV as targets_bedMethyl_to_CSV with:
+  input: "bedMethyl/CpG_context_450K_targets_{sample}.bed"
+  output: "meth_atlas/{sample}_targets.csv"
+  
 rule meth_atlas:
   input:
     csv = "meth_atlas/{sample}.csv",

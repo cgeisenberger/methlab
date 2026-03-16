@@ -1,0 +1,32 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - compilers
+  - zlib
+  - numpy>=1.0.0
+  - pandas>=1.0.0
+  - cython>=0.29.0
+  - pytest>=5.4.0
+  - matplotlib
+  - seaborn
+  - bokeh
+  - statsmodels
+  - scipy
+  - wheel
+  - pysam
+  - poetry-core
+  - xz
+  - htslib
+  - pytorch
+  - pip:
+    - ailist
+    - genome_info
+    - projectframe
+    - loess
+    - hmmCNV
+    - git+https://github.com/thomaseska/ngsfragments.git
+    - git+https://github.com/kylessmith/MethylVerse/

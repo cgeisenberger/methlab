@@ -26,6 +26,6 @@ new_bed <- merge(bed[, !11], imputed,
                 by.x = "V4", by.y = "probes",
                 all.x = FALSE, all.y = TRUE)
 setcolorder(new_bed, paste0("V", 1:11))
-
+new_bed[is.na(new_bed)] <- "."
 fwrite(new_bed, normalizePath(snakemake@output[["bed"]]),
        col.names = FALSE, scipen = 30, sep = "\t")

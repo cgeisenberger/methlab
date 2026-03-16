@@ -4,6 +4,7 @@ configfile: "/mnt/ssd/private/teska/methlab/snakemake/complete_workflow/config/c
 
 include: "crossNN.smk"
 include: "meth_atlas.smk"
+include: "mpact.smk"
 
 # extract all sample names from 'raw' directory
 INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
@@ -61,6 +62,24 @@ rule run_crossNN_imputed:
 rule run_meth_atlas:
     input:
         expand("meth_atlas/{name}_deconv_output.csv", name=INPUT)
+rule run_meth_atlas_target:
+    input:
+        expand("meth_atlas/{name}_targets_deconv_output.csv", name=INPUT)
+
+rule evaluate_crossNN:
+    input:
+        normal=expand("crossNN/{name}_crossNN_result.txt", name=INPUT),
+        target=expand("crossNN/{name}_targets_crossNN_result.txt", name=INPUT),
+        untarget=expand("crossNN/{name}_no_targets_crossNN_result.txt", name=INPUT),
+        imputed=expand("crossNN/{name}_imputed_crossNN_result.txt", name=INPUT)
+    output:
+        "crossNN_summary/normal_crossNN_summary.png",
+        "crossNN_summary/targeted_crossNN_summary.png",
+        "crossNN_summary/untargeted_crossNN_summary.png",
+        "crossNN_summary/imputed_crossNN_summary.png"
+    params: ground_truth=config["cohort_ground_truth"]
+    script:
+        "scripts/crossNN_summary.R"
 
 # trim adapters
 rule trim_galore_se:
