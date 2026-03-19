@@ -5,7 +5,7 @@ CNV_REF_GENOME: "/mnt/ssd/shared/targeted-bisulfite/genomes/hsapiens/hg38/hg38_w
 CNV_NORMAL_CONTROL: "/mnt/nas/shared/targeted_bisulfite_data/CNV_CTRL_M1A_S230_binned_1M.bed"
 BAITS: "/mnt/ssd/shared/targeted-bisulfite/input/baits/capper_v11b4_hg38.bed"
 RF_MODEL: "/mnt/ssd/shared/targeted-bisulfite/data/external/rf-capper-v11/rf_model_v11.rds"
-
+GENOME_FASTA: "/mnt/ssd/shared/targeted-bisulfite/genomes/hsapiens/hg38/hg38.fa"
 # crossNN
 crossNN_trainingset: "/mnt/ssd/shared/targeted-bisulfite/input/models/crossNN/Capper_et_al_NN.pkl"
 crossNN_mapping: "/mnt/ssd/shared/targeted-bisulfite/input/external/crossNN/450K_hg38.bed"

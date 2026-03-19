@@ -22,6 +22,7 @@ dependencies:
   - xz
   - htslib
   - pytorch
+  - methyldackel
   - pip:
     - ailist
     - genome_info
