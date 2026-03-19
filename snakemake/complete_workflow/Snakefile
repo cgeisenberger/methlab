@@ -66,6 +66,11 @@ rule run_meth_atlas_target:
     input:
         expand("meth_atlas/{name}_targets_deconv_output.csv", name=INPUT)
 
+
+rule run_mpact:
+    input:
+        expand("mpact/{name}_classification.txt", name=INPUT)
+
 rule evaluate_crossNN:
     input:
         normal=expand("crossNN/{name}_crossNN_result.txt", name=INPUT),
