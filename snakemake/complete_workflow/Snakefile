@@ -1,0 +1,330 @@
+# Snakemake workflow combining all methlab workflows
+
+configfile: "/mnt/ssd/private/teska/methlab/snakemake/complete_workflow/config/config.yaml"
+
+include: "crossNN.smk"
+include: "meth_atlas.smk"
+include: "mpact.smk"
+
+# extract all sample names from 'raw' directory
+INPUT=glob_wildcards('raw/{file}_R1_001.fastq.gz').file
+print(INPUT)
+
+# functions
+import subprocess
+import os
+
+# Custom function to check if a BAM file contains at least one alignment
+def has_alignments(bam_file):
+    print(f"SAMTOOLS VIEW WORKING DIRECTORY: {os.getcwd()}")
+    try:
+        # Run 'samtools view -c' to get the count of alignments
+        result = subprocess.run(['samtools', 'view', '-c', bam_file], 
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        # Check if the command ran successfully
+        if result.returncode != 0:
+            print(f"Error running samtools on {bam_file}: {result.stderr}")
+            return False
+        
+        # Convert the result to an integer and check if the count is greater than 0
+        alignment_count = int(result.stdout.strip())
+        print(f"Number of alignments in BAM {bam_file}: {alignment_count}")
+        return alignment_count > 0
+        
+    except Exception as e:
+        print(f"Error checking BAM file {bam_file}: {e}")
+        return False
+
+
+# generate a report for each sample
+rule all:
+    input:
+        expand("reports/{name}_overall_report.pdf", name=INPUT)
+
+# trigger with snakemake -R run_crossNN
+rule run_crossNN:
+    input:
+        expand("crossNN/{name}_crossNN_result.txt", name=INPUT)
+
+rule run_crossNN_target:
+    input:
+        expand("crossNN/{name}_targets_crossNN_result.txt", name=INPUT)
+
+rule run_crossNN_untarget:
+    input:
+        expand("crossNN/{name}_no_targets_crossNN_result.txt", name=INPUT)
+
+rule run_crossNN_imputed:
+    input:
+        expand("crossNN/{name}_imputed_crossNN_result.txt", name=INPUT)
+
+rule run_meth_atlas:
+    input:
+        expand("meth_atlas/{name}_deconv_output.csv", name=INPUT)
+rule run_meth_atlas_target:
+    input:
+        expand("meth_atlas/{name}_targets_deconv_output.csv", name=INPUT)
+
+
+rule run_mpact:
+    input:
+        expand("mpact/{name}_classification.txt", name=INPUT)
+
+rule evaluate_crossNN:
+    input:
+        normal=expand("crossNN/{name}_crossNN_result.txt", name=INPUT),
+        target=expand("crossNN/{name}_targets_crossNN_result.txt", name=INPUT),
+        untarget=expand("crossNN/{name}_no_targets_crossNN_result.txt", name=INPUT),
+        imputed=expand("crossNN/{name}_imputed_crossNN_result.txt", name=INPUT)
+    output:
+        "crossNN_summary/normal_crossNN_summary.png",
+        "crossNN_summary/targeted_crossNN_summary.png",
+        "crossNN_summary/untargeted_crossNN_summary.png",
+        "crossNN_summary/imputed_crossNN_summary.png"
+    params: ground_truth=config["cohort_ground_truth"]
+    script:
+        "scripts/crossNN_summary.R"
+
+# trim adapters
+rule trim_galore_se:
+    input:
+        "raw/{sample}.fastq.gz"
+    output:
+        "trimmed_reads/{sample}_trimmed.fq.gz"
+    threads: 4
+    log:
+        "logs/trimmed_reads/{sample}_trimming_log.txt"
+    shell:
+        "trim_galore --output_dir trimmed_reads --clip_R1 9 --three_prime_clip_r1 9 {input} &> {log}"
+
+# map to reference genome
+rule mapping:
+    input:
+        file="trimmed_reads/{sample}_trimmed.fq.gz",
+        ref=config["HUMAN_GENOME"]
+    output:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam",
+        "mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    threads: 5
+    log:
+        "logs/mapped_reads/{sample}_mapping_log.txt"
+
+    retries: 3
+    run:
+        shell("bismark --output_dir mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel 1 {input.file} &> {log}")
+        if not has_alignments(f"mapped_reads/{wildcards.sample}_trimmed_bismark_bt2.bam"):
+            raise ValueError(f"The BAM file contains no alignments.")
+
+# remove duplicate reads
+rule deduplication:
+    input:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    log:
+        "deduplicated_reads/{sample}_deduplication_log.txt"
+    shell:
+        "deduplicate_bismark --output_dir deduplicated_reads {input} &> {log}"
+
+# generate methylation context files
+rule extract_methylation:
+    input:
+        "deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam"
+    output:
+        "context_files/CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz",
+        "context_files/{sample}_trimmed_bismark_bt2.deduplicated_splitting_report.txt"
+        #"context_files/Non_CpG_context_{sample}_trimmed_bismark_bt2.deduplicated.txt.gz"
+    threads: 3
+    log:
+        "context_files/{sample}_extraction_log.txt"
+    shell:
+        "bismark_methylation_extractor --output context_files"
+        " --gzip --comprehensive --merge_non_CpG"
+        " --parallel 1 -s {input} &> {log}"
+
+# merge R1 and R2 files
+rule merge_context_files:
+    input:
+        r1="context_files/CpG_context_{sample}_R1_001_trimmed_bismark_bt2.deduplicated.txt.gz",
+        r2="context_files/CpG_context_{sample}_R2_001_trimmed_bismark_bt2.deduplicated.txt.gz"
+        #expand("context_files/CpG_context_{s}_{r}_001_trimmed_bismark_bt2.deduplicated.txt.gz", s=INPUT, r=['R1', 'R2'])
+    output:
+        "context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz"
+    shell:
+        "bismark2bedGraph --dir context_files_merged -o CpG_context_{wildcards.sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz {input.r1} {input.r2}"
+
+
+# Lamdaphage Control
+# map R1 to lambdaphage genome 
+rule LP_mapping:
+    input:
+        file="trimmed_reads/{sample}_trimmed.fq.gz",
+        ref=config["LP_GENOME"]
+    output:
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam",
+        "lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt",
+        "lambda_phage/mapped_reads/{sample}_alignment.status"
+    threads: 5
+    log:
+        "lambda_phage/log/mapping/{sample}_mapping_log.txt"
+    retries: 3
+    resources: nr = lambda wildcards, attempt: attempt
+    run:
+        shell("bismark --output_dir lambda_phage/mapped_reads --non_directional"
+        " --genome_folder {input.ref} --parallel 1 {input.file} &> {log}")
+        if not has_alignments(f"lambda_phage/mapped_reads/{wildcards.sample}_trimmed_bismark_bt2.bam"):
+            # if resources.nr < 3:
+            #     raise ValueError(f"The BAM file contains no alignments.")
+            # else:
+            shell('echo "fail" > lambda_phage/mapped_reads/{wildcards.sample}_alignment.status')
+        else:
+            shell('echo "success" > lambda_phage/mapped_reads/{wildcards.sample}_alignment.status')
+
+# remove duplicate reads
+rule LP_deduplication:
+    input:
+        bam="lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2.bam",
+        flag="lambda_phage/mapped_reads/{sample}_alignment.status"
+    output:
+        "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplicated.bam",
+        "lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    log:
+        "lambda_phage/log/deduplication/{sample}_deduplication_log.txt"
+    shell: """
+    status=$(cat {input.flag})
+    if [ "$status" = "fail" ]; then
+        touch lambda_phage/deduplicated_reads/{wildcards.sample}_trimmed_bismark_bt2.deduplicated.bam
+        touch lambda_phage/deduplicated_reads/{wildcards.sample}_trimmed_bismark_bt2.deduplication_report.txt
+    else
+        deduplicate_bismark --output_dir lambda_phage/deduplicated_reads {input.bam}
+    fi
+    """
+
+
+rule LP_collect_logfiles:
+    input:
+        mapping="lambda_phage/mapped_reads/{sample}_trimmed_bismark_bt2_SE_report.txt",
+        deduplication="lambda_phage/deduplicated_reads/{sample}_trimmed_bismark_bt2.deduplication_report.txt"
+    output:
+        "lambda_phage/log/mapping/{sample}_trimmed_bismark_bt2_SE_report.txt"
+    shell:
+        "mkdir -p lambda_phage/log/mapping && "
+        "mkdir -p lambda_phage/log/deduplication && "
+        "mv {input.mapping} lambda_phage/log/mapping && "
+        "mv {input.deduplication} lambda_phage/log/deduplication"
+
+# Generate Enrichment Heatmap
+
+# sort bam file
+rule samtools_sort:
+    input:
+        "mapped_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "sorted_reads/{sample}_trimmed_bismark_bt2.bam"
+    shell:
+        "samtools sort -T sorted_reads/{wildcards.sample} "
+        "-O bam {input} > {output}"
+
+# index bam file
+rule samtools_index:
+    input:
+        "sorted_reads/{sample}_trimmed_bismark_bt2.bam"
+    output:
+        "sorted_reads/{sample}_trimmed_bismark_bt2.bam.bai"
+    shell:
+        "samtools index {input}"
+
+# get coverage info in bigwig
+rule create_bigwig:
+    input:
+        bam="sorted_reads/{sample}_trimmed_bismark_bt2.bam",
+        bai="sorted_reads/{sample}_trimmed_bismark_bt2.bam.bai"
+    output:
+        "bigwigs/{sample}_trimmed_bismark_bt2.bw"
+    shell:
+        "bamCoverage -b {input.bam} -o {output}"
+
+# create heatmap data
+rule compute_matrix:
+    input:
+        bw="bigwigs/{sample}_trimmed_bismark_bt2.bw",
+        ref=config["BAITS"]
+    output:
+        "matrices/{sample}_matrix.tab.gz"
+    shell:
+        "computeMatrix reference-point -S {input.bw} -R {input.ref} --referencePoint center -a 1000 -b 1000 -out {output}"
+
+# plot enrichment heatmap
+rule plot_heatmap:
+    input:
+        "matrices/{sample}_matrix.tab.gz"
+    output:
+        "heatmaps/{sample}_matrix.png"
+    shell:
+        "mkdir -p heatmaps && "
+        "plotHeatmap -m {input} -out {output} "
+        "--heatmapHeight 15  --refPointLabel CpG "
+        "--regionsLabel Baits"
+
+# copy number part
+# calculate stepwise coverage 
+rule calculate_coverage:
+    input:
+        bam_r1="deduplicated_reads/{sample}_R1_001_trimmed_bismark_bt2.deduplicated.bam",
+        bam_r2="deduplicated_reads/{sample}_R2_001_trimmed_bismark_bt2.deduplicated.bam",
+        ref=config["CNV_REF_GENOME"]
+    output:
+        "cnv_files/{sample}_binned_1M.bed"
+    shell:
+        "bedtools coverage -a {input.ref} -b {input.bam_r1} {input.bam_r2} > cnv_files/{wildcards.sample}_binned_1M.bed"
+
+from pathlib import Path
+
+REF = Path(workflow.basedir) / "scripts" / "cnv.R"
+
+# plot coverage against reference
+rule cnv_image:
+    input:
+        bed="cnv_files/{sample}_binned_1M.bed",
+        ref=config["CNV_NORMAL_CONTROL"]
+    output:
+        "cnv_plots/{sample}_CNV_profile.png"
+    params:
+        cnv_scripts=str(REF)
+    script:
+        "scripts/cnv_creation.R"
+
+
+# complete report
+rule create_report:
+    input:
+        context_merged="context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz",
+        map_rep_r1="mapped_reads/{sample}_R1_001_trimmed_bismark_bt2_SE_report.txt",
+        map_rep_r2="mapped_reads/{sample}_R2_001_trimmed_bismark_bt2_SE_report.txt",
+        dedup_rep_r1="deduplicated_reads/{sample}_R1_001_trimmed_bismark_bt2.deduplication_report.txt",
+        dedup_rep_r2="deduplicated_reads/{sample}_R2_001_trimmed_bismark_bt2.deduplication_report.txt",
+        context_r1="context_files/{sample}_R1_001_trimmed_bismark_bt2.deduplicated_splitting_report.txt",
+        context_r2="context_files/{sample}_R2_001_trimmed_bismark_bt2.deduplicated_splitting_report.txt",
+        lp_rep="lambda_phage/log/mapping/{sample}_R1_001_trimmed_bismark_bt2_SE_report.txt",
+        heatm="heatmaps/{sample}_R1_001_matrix.png",
+        cnv="cnv_plots/{sample}_CNV_profile.png"
+    output:
+        "reports/{sample}_overall_report.pdf"
+    params:
+        title="Targeted-BS Report"
+    resources:
+        pdfReport=1
+    script:
+        "scripts/overall_report.Rmd"
+
+rule predict_rf:
+    input:
+        context_files=expand("context_files_merged/CpG_context_{sample}_merged_trimmed_bismark_bt2.deduplicated.txt.gz", sample=INPUT)
+    output:
+        mat="rf_prediction/rf_prediction_matrix.csv",
+        top="rf_prediction/rf_top_results.csv"
+    script:
+        "scripts/predict_rf.R"

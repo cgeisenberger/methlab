@@ -1,0 +1,53 @@
+---
+output:
+    pdf_document:
+        fig_height: 3
+        latex_engine: pdflatex
+---
+
+# `r snakemake@params[["title"]]` for Sample `r snakemake@wildcards[["sample"]]`
+
+## Sequencing
+#### Mapping R1
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["map_rep_r1"]])), width=100), sep="\n")
+```
+#### Mapping R2
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["map_rep_r2"]])), width=100), sep="\n")
+```
+#### Deduplication R1
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["dedup_rep_r1"]])), width=100), sep="\n")
+```
+#### Deduplication R2
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["dedup_rep_r2"]])), width=100), sep="\n")
+```
+
+#### Splitting R1
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["context_r1"]])), width=100), sep="\n")
+```
+#### Splitting R2
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["context_r2"]])), width=100), sep="\n")
+```
+
+## Lambdaphage Control
+```{r comment='', echo=FALSE}
+cat(strwrap(readLines(normalizePath(snakemake@input[["lp_rep"]])), width=100), sep = "\n")
+```
+
+## Enrichment Heatmap
+
+```{r, echo=FALSE}
+p_h <- normalizePath(snakemake@input[["heatm"]])
+knitr::include_graphics(p_h, rel_path=FALSE)
+```
+
+## CNV
+```{r, echo=FALSE}
+p_cnv <- normalizePath(snakemake@input[["cnv"]])
+knitr::include_graphics(p_cnv, rel_path=FALSE)
+```
