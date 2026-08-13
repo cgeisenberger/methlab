@@ -22,7 +22,8 @@ rule test_env:
 
 rule methyldackel_bedgraph:
     input:
-        bam = ancient("mapped_reads/{sample}_R1_001_trimmed_bismark_bt2.sorted.bam")
+        # bam = ancient("mapped_reads/{sample}_R1_001_trimmed_bismark_bt2.sorted.bam")
+        bam = ancient("sorted_reads/{sample}_R1_001_trimmed_bismark_bt2.bam")
     output:
         bedgraph = "methyldackel/{sample}_CpG.bedGraph"
     threads: 8
